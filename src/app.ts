@@ -8,7 +8,6 @@ interface Validatable {
     max?: number
 }
 
-
 function validate(validatableInput: Validatable): boolean {
     let isValid = true;
 
@@ -49,77 +48,155 @@ function Autobind(_: any, _2: string, descriptor: PropertyDescriptor) {
 }
 
 
-
-//* ProjectList Class
-class ProjectList {
-
+//* abstract Component Class(renders the ui) (This is the base clase that other classes [ProjectList,ProjectInput] inherits it to not duplicate the code , and we don't need to make instance from this class so we make it as an abstract class)
+abstract class Component<T extends HTMLElement, U extends HTMLElement> {
     templateElement: HTMLTemplateElement;
-    hostElement: HTMLDivElement;
-    sectionElement: HTMLElement;
+    hostElement: T;
+    element: U;
 
-
-    constructor(private type: "active" | "finished") {
-        this.templateElement = document.getElementById("project-list") as HTMLTemplateElement;
-        this.hostElement = document.getElementById("app") as HTMLDivElement;
+    constructor(templateElementId: string, hostElementId: string, insertAtStart: boolean, elementId?: string) {
+        this.templateElement = document.getElementById(templateElementId) as HTMLTemplateElement;
+        this.hostElement = document.getElementById(hostElementId) as T;
         const importedNode = document.importNode(this.templateElement.content, true);
-        this.sectionElement = importedNode.firstElementChild as HTMLElement;
-        this.sectionElement.id = `${this.type}-projects`;
+        this.element = importedNode.firstElementChild as U;
 
-
-        this.attach();
-        this.renderContent();
+        if (elementId) {
+            this.element.id = elementId;
+        }
+        this.attach(insertAtStart);
     }
 
-
-    private attach() {
-        this.hostElement.insertAdjacentElement("beforeend", this.sectionElement);
+    private attach(insertAtBeginning: boolean) {
+        this.hostElement.insertAdjacentElement(insertAtBeginning ? 'afterbegin' : 'beforeend', this.element);
     }
 
+    abstract configure(): void;
+    abstract renderContent(): void;
+}
 
-    private renderContent() {
-        const listId = `${this.type}-projects-list`;
-        this.sectionElement.querySelector("ul")!.id = listId;
-        this.sectionElement.querySelector("h2")!.textContent = this.type.toUpperCase() + ' PROJECTS';
+//* Project Class to make an instance of it(using it as a type) (project instance that we add)
+enum ProjectStatus {
+    Active, Finished
+}
+
+type Listener<T> = (items: T[]) => void;
+
+class Project {
+    constructor(public id: string, public title: string, public description: string, public people: number, public status: ProjectStatus) { }
+}
+
+//* State Class (we made this class so if we got different states , like for projects, users and so on...)
+class State<T> {
+    protected listeners: Listener<T>[] = [];
+    addListener(listenerFn: Listener<T>) {
+        this.listeners.push(listenerFn);
+    }
+}
+
+//* ProjectState Class (Class for managing the state of the application using singelton pattern (only one instance), the instance inside ProjectInput Class to take the input's data , and the instance inside ProjectList Class to give it the data to render it)
+class ProjectState extends State<Project> {
+    private projects: Project[] = [];
+    private static instance: ProjectState;
+
+    private constructor() {
+        super();
+    }
+
+    static getInstance() {
+        if (this.instance) return this.instance;
+        this.instance = new ProjectState();
+        return this.instance;
+    }
+
+    addProject(title: string, description: string, numOfPeople: number) {
+        const newProject = new Project(Math.random().toString(), title, description, numOfPeople, ProjectStatus.Active);
+        // const newProject = {
+        //     id: Math.random().toString(),
+        //     title: title,
+        //     description: description,
+        //     numOfPeople: numOfPeople
+        // }
+        this.projects.push(newProject);
+
+        for (const listenerFn of this.listeners) {
+            listenerFn(this.projects.slice());
+        }
     }
 
 }
 
+const projectState: ProjectState = ProjectState.getInstance();
 
-//* ProjectInput Class
-class ProjectInput {
 
-    templateElement: HTMLTemplateElement;
-    hostElement: HTMLDivElement;
-    formElement: HTMLFormElement;
+//* ProjectList Class (Class for rendering the data in lists)
+class ProjectList extends Component<HTMLDivElement, HTMLElement> {
+    assignedProjects: Project[];
+
+    constructor(private type: "active" | "finished") {
+        super("project-list", "app", false, `${type}-projects`);
+        this.assignedProjects = [];
+
+        this.configure();
+        this.renderContent();
+    }
+
+    configure(): void {
+        //! whenever i call addListner in any place it takes the function and push it to array so when i click button there's method gets called to call my callback function
+        projectState.addListener((projects: Project[]) => { //! this callback function will get called after i hit the button to add new project through addProject method inside ProjectState Class
+            const filteredProjects = projects.filter(prj => {
+                if (this.type === "active") return prj.status === ProjectStatus.Active;
+                if (this.type === "finished") return prj.status === ProjectStatus.Finished
+
+            })
+            this.assignedProjects = filteredProjects;
+            this.renderProjects();
+        })
+    }
+
+    renderContent() {
+        const listId = `${this.type}-projects-list`;
+        this.element.querySelector("ul")!.id = listId;
+        this.element.querySelector("h2")!.textContent = this.type.toUpperCase() + ' PROJECTS';
+    }
+
+    private renderProjects() {
+        const listEl = document.getElementById(`${this.type}-projects-list`) as HTMLUListElement;
+        listEl.innerHTML = '';
+        for (const prjItem of this.assignedProjects) {
+            const listItem = document.createElement("li");
+            listItem.textContent = prjItem.title;
+            listEl.appendChild(listItem);
+        }
+    }
+}
+
+
+//* ProjectInput Class (class for getting the data from inputs and validate it)
+class ProjectInput extends Component<HTMLDivElement, HTMLFormElement> {
     titleInputElement: HTMLInputElement;
     descriptionInputElement: HTMLInputElement;
     peopleInputElement: HTMLInputElement;
 
     constructor() {
-        this.templateElement = document.getElementById("project-input")! as HTMLTemplateElement; //! template html element
-        this.hostElement = document.getElementById("app")! as HTMLDivElement; //! div html element
-        const importedNode = document.importNode(this.templateElement.content, true); //! A Copy from document fragment #
-        this.formElement = importedNode.firstElementChild as HTMLFormElement; //! form html element
-        this.formElement.id = "user-input"; //! for styling
+        super("project-input", "app", true, "user-input");
 
-        this.titleInputElement = this.formElement.querySelector("#title") as HTMLInputElement;
-        this.descriptionInputElement = this.formElement.querySelector("#description") as HTMLInputElement;
-        this.peopleInputElement = this.formElement.querySelector("#people") as HTMLInputElement;
+        this.titleInputElement = this.element.querySelector("#title") as HTMLInputElement;
+        this.descriptionInputElement = this.element.querySelector("#description") as HTMLInputElement;
+        this.peopleInputElement = this.element.querySelector("#people") as HTMLInputElement;
 
         this.configure();
-        this.attach();
     }
 
-    private attach() {
-        this.hostElement.insertAdjacentElement("afterbegin", this.formElement);
+    configure() {
+        this.element.addEventListener('submit', this.submitHandler) //! We can do this.submitHandler.bind(this) here instead of Autobind decorator or just make submitHandler as an arrow function
     }
 
+    renderContent(): void { }
 
     private gatherUserInput(): [string, string, number] | void {
         const enteredTitle = this.titleInputElement.value;
         const enteredDescription = this.descriptionInputElement.value;
         const enteredPeople = this.peopleInputElement.value;
-
 
         const titleValidatable: Validatable = {
             value: enteredTitle,
@@ -154,23 +231,17 @@ class ProjectInput {
         // this.formElement.reset();
     }
 
-
     @Autobind
     private submitHandler(event: Event) {
         event.preventDefault();
         const userInput = this.gatherUserInput();
         if (Array.isArray(userInput)) {
             const [title, desc, people] = userInput;
-            console.log(title, desc, people);
+            projectState.addProject(title, desc, people);
+
             this.clearInputs();
         }
     }
-
-    private configure() {
-        this.formElement.addEventListener('submit', this.submitHandler) //! We can do this.submitHandler.bind(this) here instead of Autobind decorator or just make submitHandler as an arrow function
-    }
-
-
 }
 
 const prjInput = new ProjectInput();
