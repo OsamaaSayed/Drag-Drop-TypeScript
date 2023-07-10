@@ -5,11 +5,21 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start":"lite-server"
+    "start": "set NODE_OPTIONS=--openssl-legacy-provider && webpack-dev-server",
+    "build:dev": "set NODE_OPTIONS=--openssl-legacy-provider && webpack",
+    "build:prod": "set NODE_OPTIONS=--openssl-legacy-provider && webpack --config webpack.config.prod.js"
   },
   "author": "Osama Sayed",
   "license": "ISC",
   "devDependencies": {
-    "lite-server": "^2.6.1"
+    "clean-webpack-plugin": "^4.0.0",
+    "ts-loader": "^6.2.1",
+    "typescript": "^5.1.6",
+    "webpack": "^4.41.2",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.9.0"
+  },
+  "dependencies": {
+    "@types/node": "^20.4.1"
   }
 }

@@ -1,12 +1,12 @@
-import { Component } from './base-component.js';
+import { Component } from './base-component';
 
-import { projectState } from './../state/project-state.js';
-import { ProjectItem } from './project-item.js';
+import { projectState } from './../state/project-state';
+import { ProjectItem } from './project-item';
 
-import { DragTarget } from '../models/drag-drop.js'
-import { Project, ProjectStatus } from '../models/project.js';
+import { DragTarget } from '../models/drag-drop'
+import { Project, ProjectStatus } from '../models/project';
 
-import { Autobind } from '../decorators/autobind.js';
+import { Autobind } from '../decorators/autobind';
 
 
 //* ProjectList Class (Class for rendering the data in lists)

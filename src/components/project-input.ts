@@ -1,10 +1,10 @@
-import { Component } from "./base-component.js";
+import { Component } from "./base-component";
 
-import { projectState } from "../state/project-state.js";
+import { projectState } from "../state/project-state";
 
-import { Validatable, validate } from "../util/validation.js";
+import { Validatable, validate } from "../util/validation";
 
-import { Autobind } from "../decorators/autobind.js";
+import { Autobind } from "../decorators/autobind";
 
 
 //* ProjectInput Class (class for getting the data from inputs and validate it)
