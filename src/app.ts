@@ -1,3 +1,16 @@
+//* Drag & Drop Interfaces 
+interface Draggable {
+    dragStartHandler(event: DragEvent): void;
+    dragEndHandler(event: DragEvent): void;
+}
+
+interface DragTarget {
+    dragOverHandler(event: DragEvent): void; //! to tell the browser that the place you are dragging over it is a valid drag target place (fires awl m t5ush 3al place)
+    dropHandler(event: DragEvent): void; //! to react to the actual drop that happens.
+    dragLeaveHandler(event: DragEvent): void; //! to give some visual feedback to the user or if no drop happens and instead it canceled or the user moves the element away.
+}
+
+
 //* validate function for all inputs
 interface Validatable {
     value: string | number;
@@ -117,18 +130,28 @@ class ProjectState extends State<Project> {
         //     numOfPeople: numOfPeople
         // }
         this.projects.push(newProject);
+        this.updateListeners();
+    }
 
+    moveProject(projectId: string, newStatus: ProjectStatus) {
+        const project = this.projects.find(prj => prj.id === projectId);
+        if (project && project.status !== newStatus) {
+            project.status = newStatus;
+            this.updateListeners();
+        }
+    }
+
+    private updateListeners() {
         for (const listenerFn of this.listeners) {
             listenerFn(this.projects.slice());
         }
     }
-
 }
 
 const projectState: ProjectState = ProjectState.getInstance();
 
-//* ProjectItem Class (responsible for rendering a single project item)
-class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
+//* ProjectItem Class (responsible for rendering a single project item, instance used inside ProjectList Class)
+class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> implements Draggable {
     private project: Project;
 
     get Persons() {
@@ -143,7 +166,21 @@ class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
         this.renderContent();
     }
 
-    configure(): void { };
+    @Autobind
+    dragStartHandler(event: DragEvent): void {
+        event.dataTransfer!.setData("text/plain", this.project.id); //! dataTransfer property to attach the data and be able to extract it later through the id (storing the data behind the scenes during the drag operation)
+        event.dataTransfer!.effectAllowed = 'move'; //! effectAllowed controls how the cursor will look and tells the browser that we plan to move an element from A -> B
+    }
+
+    @Autobind
+    dragEndHandler(_: DragEvent): void {
+        console.log('Drag End');
+    }
+
+    configure(): void {
+        this.element.addEventListener('dragstart', this.dragStartHandler);
+        this.element.addEventListener('dragend', this.dragEndHandler);
+    };
 
     renderContent(): void {
         this.element.querySelector("h2")!.textContent = this.project.title;
@@ -153,7 +190,7 @@ class ProjectItem extends Component<HTMLUListElement, HTMLLIElement> {
 }
 
 //* ProjectList Class (Class for rendering the data in lists)
-class ProjectList extends Component<HTMLDivElement, HTMLElement> {
+class ProjectList extends Component<HTMLDivElement, HTMLElement> implements DragTarget {
     assignedProjects: Project[];
 
     constructor(private type: "active" | "finished") {
@@ -164,7 +201,33 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
         this.renderContent();
     }
 
+    @Autobind
+    dragOverHandler(event: DragEvent): void {
+        if (event.dataTransfer && event.dataTransfer.items[0].type === 'text/plain') {
+            event.preventDefault(); //! because the default behavior in js is not allowing dropping and we need to make the drop handler works
+            const listEl = this.element.querySelector("ul")!;
+            listEl.classList.add('droppable');
+        }
+
+    }
+
+    @Autobind
+    dropHandler(event: DragEvent): void {
+        const prjId = event.dataTransfer!.getData("text/plain");
+        projectState.moveProject(prjId, this.type === "active" ? ProjectStatus.Active : ProjectStatus.Finished);
+    }
+
+    @Autobind
+    dragLeaveHandler(event: DragEvent): void {
+        const listEl = this.element.querySelector("ul")!;
+        listEl.classList.remove('droppable');
+    }
+
     configure(): void {
+        this.element.addEventListener('dragover', this.dragOverHandler);
+        this.element.addEventListener('drop', this.dropHandler);
+        this.element.addEventListener('dragleave', this.dragLeaveHandler);
+
         //! whenever i call addListner in any place it takes the function and push it to array so when i click button there's method gets called to call my callback function
         projectState.addListener((projects: Project[]) => { //! this callback function will get called after i hit the button to add new project through addProject method inside ProjectState Class
             const filteredProjects = projects.filter(prj => {
